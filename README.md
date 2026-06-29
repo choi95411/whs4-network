@@ -63,7 +63,7 @@ sudo ./assignment
 현재 코드는 eth0  인터페이스에서 패킷을 캡처하도록 설정되어 있습니다.
 
 ```c
-pcap_open_live("lo", BUFSIZ, 1, 1000, errbuf);
+pcap_open_live("eth0", BUFSIZ, 1, 1000, errbuf);
 ```
 
 또한 현재 BPF 필터는 80번 포트의 TCP 패킷을 캡처하도록 설정되어 있습니다.
