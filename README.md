@@ -26,7 +26,7 @@ C 언어와 `libpcap` 라이브러리를 사용하여 구현한 간단한 패킷
 ## 파일 구성
 
 ```text
-assingment.c   # 패킷 캡처 및 분석을 수행하는 메인 소스 코드
+assignment.c   # 패킷 캡처 및 분석을 수행하는 메인 소스 코드
 myheader.h     # Ethernet, IP, TCP 헤더 구조체 정의
 README.md      # 프로젝트 설명 및 실행 방법
 ```
@@ -57,57 +57,55 @@ gcc -Wall -Wextra assignment.c -o assignment -lpcap
 패킷 캡처에는 권한이 필요하므로 `sudo`를 사용하여 실행합니다.
 
 ```bash
-sudo ./assingment
+sudo ./assignment
 ```
 
-현재 코드는 loopback 인터페이스에서 패킷을 캡처하도록 설정되어 있습니다.
+현재 코드는 eth0  인터페이스에서 패킷을 캡처하도록 설정되어 있습니다.
 
 ```c
 pcap_open_live("lo", BUFSIZ, 1, 1000, errbuf);
 ```
 
-또한 현재 BPF 필터는 8080번 포트의 TCP 패킷을 캡처하도록 설정되어 있습니다.
+또한 현재 BPF 필터는 80번 포트의 TCP 패킷을 캡처하도록 설정되어 있습니다.
 
 ```c
-char filter_exp[] = "tcp port 8080";
+char filter_exp[] = "tcp port 80";
 ```
 
 ## 테스트 방법
 
-본 실습에서는 안전한 테스트를 위해 외부 사이트가 아닌 로컬 HTTP 서버를 사용하였습니다.
-
-로컬 환경에서 HTTP 통신을 발생시키기 위해 터미널 3개를 사용합니다.
+WSL 환경에서 HTTP 통신을 발생시키기 위해 터미널 3개를 사용합니다.
 
 ### 터미널 1: 패킷 스니퍼 실행
 
 ```bash
-sudo ./assingment
+sudo ./assignment
 ```
 
 ### 터미널 2: 로컬 HTTP 서버 실행
 
 ```bash
-python3 -m http.server 8080
+python3 -m http.server 80 --bind 0.0.0.0
 ```
 
 ### 터미널 3: HTTP 요청 전송
 
 ```bash
-curl http://127.0.0.1:8080
+curl http://192.168.64.1:80/
 ```
 
 ## 실행 결과 예시
 
 ```text
-Src Mac: 00:00:00:00:00:00
-Dst Mac: 00:00:00:00:00:00
-Src ip: 127.0.0.1
-Dst ip: 127.0.0.1
-Src port: 53942
-Dst port: 8080
+Src Mac: 00:15:5d:66:23:71
+Dst Mac: 00:15:5d:a1:fd:1d
+Src ip: 192.168.78.125
+Dst ip: 192.168.64.1
+Src port: 39310
+Dst port: 80
 HTTP Messages:
 GET / HTTP/1.1
-Host: 127.0.0.1:8080
+Host: 127.0.0.1:80
 User-Agent: curl/8.5.0
 Accept: */*
 ```
@@ -115,12 +113,12 @@ Accept: */*
 서버 응답 패킷이 캡처되면 다음과 같이 HTTP 응답 메시지도 확인할 수 있습니다.
 
 ```text
-Src Mac: 00:00:00:00:00:00
-Dst Mac: 00:00:00:00:00:00
-Src ip: 127.0.0.1
-Dst ip: 127.0.0.1
-Src port: 8080
-Dst port: 53942
+Src Mac: 00:15:5d:66:23:71
+Dst Mac: 00:15:5d:a1:fd:1d
+Src ip: 192.168.78.125
+Dst ip: 192.168.64.1
+Src port: 80
+Dst port: 39310
 HTTP Messages:
 HTTP/1.0 200 OK
 Server: SimpleHTTP/0.6 Python/3.12.3
@@ -155,33 +153,3 @@ Dst Mac: 00:00:00:00:00:00
 6. IPv4 패킷인 경우 IP Header를 파싱합니다.
 7. TCP 패킷인 경우 TCP Header를 파싱합니다.
 8. TCP payload가 존재하면 HTTP Message로 출력합니다.
-
-## 주의사항
-
-* HTTP Message는 TCP payload가 존재하는 패킷에서만 출력됩니다.
-* TCP 연결 과정에서 발생하는 SYN, ACK, FIN 패킷은 HTTP 데이터를 포함하지 않을 수 있습니다.
-* HTTP 요청과 응답은 여러 TCP 패킷으로 나뉘어 출력될 수 있습니다.
-* HTTPS 통신은 암호화되어 있으므로 HTTP Message를 평문으로 확인할 수 없습니다.
-* 실제 네트워크 인터페이스에서 캡처하려면 `lo` 대신 `eth0`, `ens33`, `enp0s3` 등 자신의 환경에 맞는 인터페이스 이름으로 수정해야 합니다.
-
-사용 가능한 네트워크 인터페이스는 다음 명령어로 확인할 수 있습니다.
-
-```bash
-ip -br addr
-```
-
-## 실제 네트워크 인터페이스 사용 시
-
-로컬호스트가 아닌 실제 네트워크 인터페이스에서 테스트하려면 코드의 인터페이스 이름을 변경하면 됩니다.
-
-예를 들어 실제 인터페이스 이름이 `eth0`인 경우 다음과 같이 수정할 수 있습니다.
-
-```c
-pcap_open_live("eth0", BUFSIZ, 1, 1000, errbuf);
-```
-
-외부 HTTP 트래픽을 캡처하려면 필터를 80번 포트로 변경할 수 있습니다.
-
-```c
-char filter_exp[] = "tcp port 80";
-```
